@@ -1,0 +1,48 @@
+{
+  "name": "odtu-cli",
+  "version": "1.0.0",
+  "description": "ODTU CLI - access your METU courses from the terminal. Interactive, fun, arrow-key driven.",
+  "type": "module",
+  "bin": {
+    "odtu": "./bin/odtu.js"
+  },
+  "files": [
+    "bin/",
+    "src/"
+  ],
+  "keywords": [
+    "metu",
+    "odtu",
+    "odtuclass",
+    "moodle",
+    "cli",
+    "university",
+    "courses",
+    "grades",
+    "terminal"
+  ],
+  "author": "ibracob.dev",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ibraschwan/odtu-cli.git"
+  },
+  "homepage": "https://github.com/ibraschwan/odtu-cli#readme",
+  "bugs": {
+    "url": "https://github.com/ibraschwan/odtu-cli/issues"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "commander": "^12.1.0",
+    "@inquirer/prompts": "^7.2.0",
+    "chalk": "^5.4.1",
+    "ora": "^8.1.1",
+    "gradient-string": "^3.0.0",
+    "boxen": "^8.0.1",
+    "cli-table3": "^0.6.5",
+    "axios": "^1.7.9",
+    "cheerio": "^1.0.0"
+  }
+}

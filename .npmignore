@@ -1,0 +1,6 @@
+*.har
+*.log
+.claude/
+.DS_Store
+Untitled Project.txt
+.gitignore

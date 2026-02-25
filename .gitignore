@@ -1,0 +1,5 @@
+node_modules/
+*.har
+*.log
+.DS_Store
+.claude/
