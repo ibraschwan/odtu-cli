@@ -1,5 +1,5 @@
 {
-  "name": "odtu-cli",
+  "name": "odtu",
   "version": "1.0.0",
   "description": "ODTU CLI - access your METU courses from the terminal. Interactive, fun, arrow-key driven.",
   "type": "module",

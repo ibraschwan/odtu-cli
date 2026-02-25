@@ -20,7 +20,7 @@ Access your METU courses right from the terminal. Interactive, fun, arrow-key dr
 ## Install
 
 ```bash
-npm install -g odtu-cli
+npm install -g odtu
 ```
 
 ## Usage
