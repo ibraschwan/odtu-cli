@@ -1,0 +1,21 @@
+{
+  "name": "odtu-promo-video",
+  "version": "1.0.0",
+  "scripts": {
+    "studio": "remotion studio src/index.tsx",
+    "render": "remotion render src/index.tsx OdtuPromo out/odtu-promo.mp4",
+    "build": "remotion render src/index.tsx OdtuPromo out/odtu-promo.mp4 --codec h264"
+  },
+  "dependencies": {
+    "@remotion/cli": "4.0.428",
+    "@remotion/google-fonts": "4.0.428",
+    "@remotion/transitions": "4.0.428",
+    "react": "19.2.4",
+    "react-dom": "19.2.4",
+    "remotion": "4.0.428"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.0",
+    "typescript": "^5.7.0"
+  }
+}
