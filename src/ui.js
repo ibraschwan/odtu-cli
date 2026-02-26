@@ -24,7 +24,7 @@ const BANNER_ART = [
   '         :::',
   '         :::',
   '        ::::',
-  '        :::     welcome to odtu cli v1.0         built with <3 by ibracob.dev',
+  '        :::     welcome to odtu cli v2.0         built with <3 by ibracob.dev',
 ];
 
 export async function showBanner({ animate = true } = {}) {

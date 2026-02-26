@@ -1,6 +1,6 @@
 # odtu
 
-Access your METU courses right from the terminal. Interactive, fun, arrow-key driven.
+Access your METU courses, transcript, GPA, and curriculum right from the terminal.
 
 ```
                           :
@@ -14,7 +14,7 @@ Access your METU courses right from the terminal. Interactive, fun, arrow-key dr
          :::
          :::
         ::::
-        :::     welcome to odtu cli v1.0         built with <3 by ibracob.dev
+        :::     welcome to odtu cli v2.0         built with <3 by ibracob.dev
 ```
 
 ## Install
@@ -26,16 +26,21 @@ npm install -g odtu
 ## Quick Start
 
 ```bash
-odtu login    # interactive wizard - pick year, semester, enter credentials
-odtu courses  # see your courses
-odtu grades   # check your grades
+odtu login        # interactive wizard - pick year, semester, enter credentials
+odtu courses      # see your courses
+odtu grades       # check your grades
+odtu transcript   # full university transcript
+odtu gpa          # GPA history with visual chart
+odtu curriculum   # curriculum progress tracker
+odtu profile      # student profile + financial status
 ```
 
 ## All Commands
 
+### ODTUClass (Moodle)
+
 | Command | Description |
 |---------|-------------|
-| `odtu` | Show animated banner + help |
 | `odtu login` | Interactive login wizard with arrow-key selection |
 | `odtu courses` | List enrolled courses (`-f inprogress\|past\|future\|all`) |
 | `odtu grades` | Grades overview across all courses |
@@ -50,19 +55,36 @@ odtu grades   # check your grades
 | `odtu forums <id>` | Forums in a course |
 | `odtu forums <id> -f <fid>` | Discussions in a specific forum |
 | `odtu dashboard` | Full overview: active courses + upcoming events |
+
+### Student Portal (student.metu.edu.tr)
+
+| Command | Description |
+|---------|-------------|
+| `odtu transcript` | Full university transcript - all semesters, courses, grades, ECTS |
+| `odtu gpa` | Semester-by-semester GPA breakdown with visual progress bar |
+| `odtu curriculum` | Curriculum completion tracker (completed/failed/not taken) |
+| `odtu schedule` | Weekly course schedule grid |
+| `odtu profile` | Student profile, registered courses, tuition debt, portal services |
+
+### Session
+
+| Command | Description |
+|---------|-------------|
+| `odtu` | Show animated banner + help |
 | `odtu switch` | Change to a different semester |
 | `odtu status` | Check current session status |
 | `odtu logout` | Clear saved session and credentials |
 
 ## Features
 
+- Two data sources in one CLI: ODTUClass (Moodle) + Student Portal
 - Arrow-key year & semester selection (no typing numbers)
 - Dithering ASCII banner animation on startup
-- Auto re-login when session expires - you log in once, it just works
+- Auto re-login when session expires
 - Gradient-colored terminal UI with animated spinners
-- Academic year display (2025-2026 format)
-- Grades via HTML scraping (Moodle doesn't expose them via API)
-- Assignment fallback scraping when the API fails
+- GPA visualization with progress bars
+- Curriculum completion tracking with percentage
+- Color-coded grades (green for passing, red for failing)
 
 ## Security & Data Storage
 
@@ -70,98 +92,150 @@ Your data is stored locally on your machine. Nothing is sent anywhere except to 
 
 ### What is saved
 
-A single file: `~/.odtuclass/session.json`
+Two files in `~/.odtuclass/`:
+
+**`session.json`** - ODTUClass (Moodle) session
 
 | Field | Purpose |
 |-------|---------|
-| `cookies` | Moodle session cookie (authenticates API requests) |
-| `sesskey` | Moodle CSRF token (required for every API call) |
+| `cookies` | Moodle session cookie |
+| `sesskey` | Moodle CSRF token |
 | `user_id` | Your Moodle user ID |
 | `username` | Your METU username |
 | `password` | Your METU password (for auto re-login) |
 | `year` | Selected academic year |
 | `semester` | Selected semester code |
 
+**`student-session.json`** - Student Portal session
+
+| Field | Purpose |
+|-------|---------|
+| `token` | JWT from student.metu.edu.tr SSO |
+| `username` | Your METU username |
+| `password` | Your METU password (for token refresh) |
+
 ### How it is protected
 
-- **File permissions `0600`** - only your OS user can read/write the file. No other user or process on the machine can access it.
-- **Local only** - credentials never leave your machine. They are sent only to `odtuclass*.metu.edu.tr` over HTTPS during login.
+- **File permissions `0600`** - only your OS user can read/write. No other user or process on the machine can access it.
+- **Local only** - credentials never leave your machine. They are sent only to `*.metu.edu.tr` over HTTPS.
 - **No telemetry** - zero analytics, zero tracking, zero external calls.
-- **`odtu logout` wipes everything** - deletes the session file entirely.
+- **`odtu logout` wipes everything** - deletes all session files entirely.
 
 ### Why the password is stored
 
-Moodle sessions expire after a period of inactivity. Without the saved password, you'd have to run `odtu login` every time the session expires. With it, the CLI silently re-authenticates in the background and you never notice.
+Both Moodle sessions and Student Portal JWTs expire. Without the saved password, you'd have to run `odtu login` every time. With it, the CLI silently re-authenticates in the background.
 
-If you prefer not to save your password, you can edit `~/.odtuclass/session.json` and remove the `password` field. Auto re-login will be disabled, but everything else works normally.
+To disable: edit `~/.odtuclass/session.json` and remove the `password` field.
 
 ## How It Works
 
-Authenticates against METU's Moodle instance (`odtuclass{year}{semester}.metu.edu.tr`) using session-based auth:
+### ODTUClass (Moodle)
 
-1. **GET** `/login/index.php` - fetch the login page, extract the CSRF `logintoken`
-2. **POST** `/login/index.php` - submit username, password, logintoken
-3. **GET** `/my/` - load dashboard, extract `sesskey` and `userId` from `M.cfg` JS object
+Authenticates against `odtuclass{year}{semester}.metu.edu.tr`:
 
-After login, all data is fetched via:
-- **Moodle AJAX API** (`/lib/ajax/service.php`) - courses, calendar events, forums, site info
-- **HTML scraping** - grades overview, detailed course grades, assignment fallback
+1. **GET** `/login/index.php` - fetch login page, extract CSRF `logintoken`
+2. **POST** `/login/index.php` - submit credentials
+3. **GET** `/my/` - extract `sesskey` and `userId` from `M.cfg` JS object
 
-### Moodle API Methods Used
+Data is fetched via **Moodle AJAX API** (`/lib/ajax/service.php`) and **HTML scraping**.
 
-| Method | Used For |
-|--------|----------|
+| Moodle API Method | Used For |
+|-------------------|----------|
 | `core_webservice_get_site_info` | Auth check, user info |
 | `core_course_get_enrolled_courses_by_timeline_classification` | Course listing |
-| `core_course_get_contents` | Course sections/modules, assignments |
-| `core_calendar_get_action_events_by_timesort` | Calendar events by date range |
-| `core_calendar_get_action_events_by_course` | Calendar events by course |
+| `core_course_get_contents` | Course sections/modules |
+| `core_calendar_get_action_events_by_timesort` | Calendar events |
+| `core_calendar_get_action_events_by_course` | Course-specific events |
 | `mod_forum_get_forums_by_courses` | Forum listing |
 | `mod_forum_get_forum_discussions` | Forum discussions |
 
-### HTML Pages Scraped
+### Student Portal (student.metu.edu.tr)
 
-| Page | Used For |
-|------|----------|
-| `/grade/report/overview/index.php` | Grades overview table |
-| `/course/user.php?mode=grade&id=X&user=Y` | Detailed course grades |
-| `/course/view.php?id=X` | Assignment fallback |
+Authenticates via METU SSO with JWT tokens:
+
+1. **POST** `/sso/backend/request/user/signin` - submit `{username, password}`, receive JWT in `Token` header
+2. **POST** `/portal/backend/request/route/get_menu` - profile data + available services (uses `Token` header)
+3. **POST** `/portal/backend/request/route/get_content` - get encrypted package token for a service
+4. **GET** `/portal/content.php?pkg=<token>` - get auto-login form for Student Information proxy
+5. **POST** `/proxy/Student_Information/main.php` - submit encrypted credentials (302 redirect)
+6. **GET** `/proxy/Student_Information/get.php?package=<token>` - full Student Information HTML page (~185KB)
+
+The HTML page contains 12 tabs of data parsed with cheerio:
+
+| Tab | Data Available |
+|-----|---------------|
+| Contact | Ankara address, home address, Mernis address |
+| Semester Detail | Enrolled courses, registration, add/drop, tuition, library debt, advisor |
+| Academic Record | Per-semester GPA, courses with grades and grade points |
+| Course Schedule | Weekly timetable grid |
+| Transcript | Full transcript with ECTS, department ranking, notes |
+| Curriculum | All required courses with completion status |
+| Graduation | Graduation status |
+| Exam Dates | Upcoming exam schedule |
+| Scholarship | Scholarship information |
+| Military | Military service info |
+| Leave | Disciplinary/leave records |
+| Replace Course | Course replacement history |
 
 ## For AI Agents
 
-If you're an AI agent helping a user with this CLI, here's what you need to know:
+If you're an AI agent (Claude, GPT, Copilot, etc.) helping a user with this CLI:
 
 ### Setup
+
 ```bash
 npm install -g odtu    # install globally
 odtu login             # must run interactively (needs arrow keys + password input)
 ```
 
-### Common patterns
+### ODTUClass data (per-semester Moodle data)
+
 ```bash
-# Get all course IDs
-odtu courses
+odtu courses                    # list courses with IDs
+odtu grades                     # grades overview
+odtu grades 1234                # detailed grades for course 1234
+odtu assignments                # all assignments
+odtu deadlines -d 7             # what's due in the next 7 days
+odtu announcements 1234 -n 20   # latest 20 announcements for a course
+odtu contents 1234              # course sections & materials
+```
 
-# Get grades for course 1234
-odtu grades 1234
+### Student Portal data (university-wide academic record)
 
-# Check what's due in the next 7 days
-odtu deadlines -d 7
-
-# Get announcements for a specific course
-odtu announcements 1234 -n 20
-
-# If session is broken, re-login
-odtu logout && odtu login
+```bash
+odtu transcript    # full transcript: all semesters, all courses, all grades
+odtu gpa           # GPA per semester + cumulative GPA + standing
+odtu curriculum    # required courses with completion status
+odtu schedule      # weekly course schedule
+odtu profile       # student info, registered courses, tuition debt
 ```
 
 ### Programmatic notes
+
 - All commands exit `0` on success, `1` on error
 - Error output goes to stderr with prefixes: `Auth error:`, `API error:`, `Error:`
-- Session file is at `~/.odtuclass/session.json` (JSON, readable)
-- The `login` command requires an interactive terminal (TTY) for arrow-key prompts
-- If the session expires and credentials are saved, API calls auto-retry after re-login
+- Session files are at `~/.odtuclass/` (JSON, readable)
+- `odtu login` requires an interactive terminal (TTY) for arrow-key prompts
+- If sessions expire and credentials are saved, API calls auto-retry after re-login
 - Course IDs are integers, visible in `odtu courses` output
+
+### Data pipeline example
+
+An AI agent can extract structured academic data by running CLI commands and parsing the terminal output. The transcript, GPA, and curriculum commands output formatted tables that contain all semester data, grades, credits, and completion status.
+
+```bash
+# Example: check if student is at risk
+odtu gpa           # look at cumulative GPA and standing
+odtu curriculum    # check completion percentage
+odtu deadlines     # any upcoming deadlines?
+```
+
+### Session recovery
+
+```bash
+odtu status        # check if sessions are valid
+odtu logout && odtu login   # full re-login if broken
+```
 
 ## License
 

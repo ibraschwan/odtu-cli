@@ -13,13 +13,18 @@ import contents from '../src/commands/contents.js';
 import forums from '../src/commands/forums.js';
 import announcements from '../src/commands/announcements.js';
 import dashboard from '../src/commands/dashboard.js';
+import transcript from '../src/commands/transcript.js';
+import gpa from '../src/commands/gpa.js';
+import curriculum from '../src/commands/curriculum.js';
+import schedule from '../src/commands/schedule.js';
+import profile from '../src/commands/profile.js';
 
 const program = new Command();
 
 program
   .name('odtu')
   .description('ODTU CLI - access your METU courses from the terminal')
-  .version('1.0.0');
+  .version('2.0.0');
 
 login(program);
 logout(program);
@@ -33,6 +38,11 @@ contents(program);
 forums(program);
 announcements(program);
 dashboard(program);
+transcript(program);
+gpa(program);
+curriculum(program);
+schedule(program);
+profile(program);
 
 // Bare "odtu" with no subcommand → animated banner + help
 if (process.argv.length <= 2) {

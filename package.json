@@ -1,7 +1,7 @@
 {
   "name": "odtu",
-  "version": "1.0.0",
-  "description": "ODTU CLI - access your METU courses from the terminal. Interactive, fun, arrow-key driven.",
+  "version": "2.0.0",
+  "description": "ODTU CLI - access your METU courses, transcript, GPA, and curriculum from the terminal.",
   "type": "module",
   "bin": {
     "odtu": "./bin/odtu.js"
@@ -19,7 +19,11 @@
     "university",
     "courses",
     "grades",
-    "terminal"
+    "transcript",
+    "gpa",
+    "curriculum",
+    "terminal",
+    "student-portal"
   ],
   "author": "ibracob.dev",
   "license": "MIT",

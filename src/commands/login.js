@@ -1,6 +1,7 @@
 import chalk from 'chalk';
 import { select, input, password } from '@inquirer/prompts';
 import { ODTUClassClient } from '../client.js';
+import { StudentClient } from '../student-client.js';
 import {
   showBanner, spinner, successBox,
   guessSemester, semesterLabel, semesterArt, handleErrors,
@@ -70,7 +71,19 @@ export default function (program) {
       const client = new ODTUClassClient(year, semester);
 
       await client.login(username, pw, (msg) => { s.text = msg; });
-      s.succeed('Connected!');
+      s.succeed('ODTUClass connected!');
+
+      // ── Also login to Student Portal ─────────────────────
+      const s2 = spinner('Connecting to Student Portal...').start();
+      let studentOk = false;
+      try {
+        const studentClient = new StudentClient();
+        await studentClient.login(username, pw);
+        s2.succeed('Student Portal connected!');
+        studentOk = true;
+      } catch {
+        s2.warn('Student Portal login failed (ODTUClass still works)');
+      }
 
       // ── Success Screen ────────────────────────────────────
       let fullname = username;
@@ -79,16 +92,24 @@ export default function (program) {
         fullname = info.fullname || username;
       } catch { /* ignore */ }
 
+      const portalLine = studentOk
+        ? `  Portal:    ${chalk.green('student.metu.edu.tr')}\n`
+        : `  Portal:    ${chalk.dim('not connected')}\n`;
+
       successBox(
         `${chalk.green.bold(`Welcome, ${fullname}!`)}\n\n` +
         `  Semester:  ${chalk.bold(`${academicYearLabel(year)} ${semesterLabel(semester)}`)}\n` +
         `  Domain:    ${chalk.dim(domain)}\n` +
+        portalLine +
         `  Session:   ${chalk.dim('saved to ~/.odtuclass/')}\n\n` +
         `${chalk.dim('Quick start:')}\n` +
-        `  ${chalk.cyan('odtu courses')}      List your courses\n` +
-        `  ${chalk.cyan('odtu grades')}       View your grades\n` +
-        `  ${chalk.cyan('odtu assignments')}  See assignments\n` +
-        `  ${chalk.cyan('odtu dashboard')}    Full overview`,
+        `  ${chalk.cyan('odtu courses')}       List your courses\n` +
+        `  ${chalk.cyan('odtu grades')}        View your grades\n` +
+        `  ${chalk.cyan('odtu transcript')}    Full transcript\n` +
+        `  ${chalk.cyan('odtu gpa')}           GPA history\n` +
+        `  ${chalk.cyan('odtu curriculum')}    Curriculum progress\n` +
+        `  ${chalk.cyan('odtu profile')}       Student profile\n` +
+        `  ${chalk.cyan('odtu dashboard')}     Full overview`,
         chalk.green.bold('Login Successful'),
       );
     }));
