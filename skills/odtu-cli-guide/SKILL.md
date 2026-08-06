@@ -10,7 +10,7 @@ description: >
   "help me with odtu cli", "use odtu", "run odtu commands", "check my student portal",
   or "organize my school tasks". Also triggers when the user mentions "odtu", "odtuclass",
   "metu", "moodle grades", "student portal", "university transcript", or "course schedule".
-version: 2.1.0
+version: 2.1.1
 ---
 
 # ODTU CLI Agent Guide

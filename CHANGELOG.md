@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.1.1 (2026-08-06)
+
+- Add GitHub Actions CI across supported Node.js releases.
+- Add tag-driven npm publishing through OIDC trusted publishing.
+- Correct the minimum Node.js version to match runtime dependencies.
+
 ## 2.1.0 (2026-08-06)
 
 - Add `odtu materials` to archive course files and announcements by week.

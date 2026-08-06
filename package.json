@@ -1,14 +1,18 @@
 {
   "name": "odtu",
-  "version": "2.1.0",
+  "version": "2.1.1",
   "description": "ODTU CLI - access your METU courses, transcript, GPA, and curriculum from the terminal.",
   "type": "module",
   "bin": {
     "odtu": "./bin/odtu.js"
   },
+  "scripts": {
+    "test": "node scripts/check.js"
+  },
   "files": [
     "bin/",
-    "src/"
+    "src/",
+    "scripts/"
   ],
   "keywords": [
     "metu",
@@ -36,7 +40,7 @@
     "url": "https://github.com/ibraschwan/odtu-cli/issues"
   },
   "engines": {
-    "node": ">=18"
+    "node": ">=20.18.1"
   },
   "dependencies": {
     "commander": "^12.1.0",

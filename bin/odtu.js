@@ -26,7 +26,7 @@ const program = new Command();
 program
   .name('odtu')
   .description('ODTU CLI - access your METU courses from the terminal')
-  .version('2.1.0');
+  .version('2.1.1');
 
 login(program);
 logout(program);
