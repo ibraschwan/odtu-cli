@@ -53,6 +53,7 @@ odtu profile      # student profile + financial status
 | `odtu announcements <id>` | Announcements for one course (`-n 10` for more) |
 | `odtu contents <id>` | Course sections & activities as a tree |
 | `odtu download <id> [moduleId]` | Download PDFs and other attached course/assignment files (`-o <dir>`) |
+| `odtu materials <id>` | Archive files and announcements, including sites with disabled Moodle APIs |
 | `odtu forums <id>` | Forums in a course |
 | `odtu forums <id> -f <fid>` | Discussions in a specific forum |
 | `odtu dashboard` | Full overview: active courses + upcoming events |
@@ -201,6 +202,7 @@ odtu announcements 1234 -n 20   # latest 20 announcements for a course
 odtu contents 1234              # course sections & materials
 odtu download 1234              # download every attached file in a course
 odtu download 1234 5678 -o docs # download files from module 5678 into ./docs
+odtu materials 1234 --convert-pptx --merge all # archive by week and produce one PDF
 ```
 
 ### Student Portal data (university-wide academic record)

@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.1.0 (2026-08-06)
+
+- Add `odtu materials` to archive course files and announcements by week.
+- Fall back to authenticated Moodle HTML when course AJAX services are disabled.
+- Optionally convert PPT/PPTX files with LibreOffice and merge PDFs weekly or into one file.
+- Ignore local `ders/` and `downloads/` directories to protect private course material.
+
 ## 2.0.1 (2026-08-06)
 
 - Use the `sum` hostname suffix for ODTUClass summer semesters.

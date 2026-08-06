@@ -1,6 +1,6 @@
 {
   "name": "odtu",
-  "version": "2.0.1",
+  "version": "2.1.0",
   "description": "ODTU CLI - access your METU courses, transcript, GPA, and curriculum from the terminal.",
   "type": "module",
   "bin": {

@@ -98,7 +98,8 @@ export class ODTUClassClient {
         'X-Requested-With': 'XMLHttpRequest',
       };
       const cs = this._cookieStr();
-      if (cs) redirectHeaders.Cookie = cs;
+      const baseOrigin = this.baseUrl ? new URL(this.baseUrl).origin : new URL(url).origin;
+      if (cs && new URL(location).origin === baseOrigin) redirectHeaders.Cookie = cs;
 
       resp = await axios({
         method: 'GET',

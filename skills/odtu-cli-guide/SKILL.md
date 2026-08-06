@@ -10,7 +10,7 @@ description: >
   "help me with odtu cli", "use odtu", "run odtu commands", "check my student portal",
   or "organize my school tasks". Also triggers when the user mentions "odtu", "odtuclass",
   "metu", "moodle grades", "student portal", "university transcript", or "course schedule".
-version: 2.0.1
+version: 2.1.0
 ---
 
 # ODTU CLI Agent Guide
@@ -60,6 +60,7 @@ Sessions auto-refresh when credentials are saved. If a command fails with "Auth 
 | `odtu announcements [courseId]` | Course announcements | `-n <count>` (default: 5) |
 | `odtu contents <courseId>` | Course sections and materials tree | — |
 | `odtu download <courseId> [moduleId]` | Download attached course or assignment files | `-o <directory>` |
+| `odtu materials <courseId>` | Archive files and announcements; supports HTML fallback | `--convert-pptx`, `--merge weekly\|all`, `-o <directory>` |
 | `odtu forums <courseId>` | Forum list or discussions | `-f <forumId>` |
 | `odtu dashboard` | Full overview (courses + 7-day events) | — |
 
