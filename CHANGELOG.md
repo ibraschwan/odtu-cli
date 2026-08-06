@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.0.1 (2026-08-06)
+
+- Use the `sum` hostname suffix for ODTUClass summer semesters.
+- Add authenticated downloads for course and assignment attachments.
+- Show module IDs in assignment and course-content listings.
+
 ## 2.0.0 (2026-02-26)
 
 ### Student Portal Integration

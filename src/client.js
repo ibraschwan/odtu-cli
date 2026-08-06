@@ -12,7 +12,8 @@ const SESSION_DIR = join(homedir(), '.odtuclass');
 const SESSION_FILE = join(SESSION_DIR, 'session.json');
 
 export function makeBaseUrl(year, semester) {
-  return `https://odtuclass${year}${semester.toLowerCase()}.metu.edu.tr`;
+  const semesterPrefix = semester.toLowerCase() === 'u' ? 'sum' : semester.toLowerCase();
+  return `https://odtuclass${year}${semesterPrefix}.metu.edu.tr`;
 }
 
 export class AuthError extends Error {
@@ -61,7 +62,7 @@ export class ODTUClassClient {
     }
   }
 
-  async _request(method, url, data = null, { json = false, params = null } = {}) {
+  async _request(method, url, data = null, { json = false, params = null, responseType = null } = {}) {
     const headers = {
       'User-Agent': 'ODTU-CLI/1.0',
       'Accept': 'application/json, text/javascript, */*; q=0.01',
@@ -82,6 +83,7 @@ export class ODTUClassClient {
 
     if (params) config.params = params;
     if (data !== null) config.data = data;
+    if (responseType) config.responseType = responseType;
 
     let resp = await axios(config);
     this._collectCookies(resp);
@@ -104,6 +106,7 @@ export class ODTUClassClient {
         headers: redirectHeaders,
         maxRedirects: 0,
         validateStatus: () => true,
+        ...(responseType ? { responseType } : {}),
       });
       this._collectCookies(resp);
       url = location;
@@ -346,6 +349,24 @@ export class ODTUClassClient {
 
   async getCourseContents(courseId) {
     return await this.apiCall('core_course_get_contents', { courseid: courseId });
+  }
+
+  async downloadFile(fileUrl, _retried = false) {
+    const url = new URL(fileUrl, this.baseUrl);
+    if (url.origin !== new URL(this.baseUrl).origin) {
+      throw new APIError('Refusing to send session credentials to an external download host');
+    }
+
+    const resp = await this._request('GET', url.href, null, { responseType: 'arraybuffer' });
+    const finalUrl = resp.finalUrl || '';
+    if (!_retried && finalUrl.includes('/login/index.php') && this._canAutoReLogin()) {
+      await this._autoReLogin();
+      return await this.downloadFile(fileUrl, true);
+    }
+    if (finalUrl.includes('/login/index.php')) {
+      throw new AuthError('Session expired. Run: odtu login');
+    }
+    return Buffer.from(resp.data);
   }
 
   async getGradesOverview() {

@@ -30,7 +30,7 @@ export default function (program) {
           const prefix = isLast ? '  └── ' : '  ├── ';
           const icon = moduleIcon(mod.modname);
           const url = mod.url ? chalk.dim(` ${mod.url}`) : '';
-          console.log(`${prefix}${icon} ${mod.name} ${chalk.dim(`(${mod.modname})`)}${url}`);
+          console.log(`${prefix}${icon} ${mod.name} ${chalk.dim(`(${mod.modname}, id: ${mod.id})`)}${url}`);
         });
       }
       console.log();

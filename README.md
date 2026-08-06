@@ -52,6 +52,7 @@ odtu profile      # student profile + financial status
 | `odtu announcements` | Announcements across all active courses |
 | `odtu announcements <id>` | Announcements for one course (`-n 10` for more) |
 | `odtu contents <id>` | Course sections & activities as a tree |
+| `odtu download <id> [moduleId]` | Download PDFs and other attached course/assignment files (`-o <dir>`) |
 | `odtu forums <id>` | Forums in a course |
 | `odtu forums <id> -f <fid>` | Discussions in a specific forum |
 | `odtu dashboard` | Full overview: active courses + upcoming events |
@@ -131,7 +132,7 @@ To disable: edit `~/.odtuclass/session.json` and remove the `password` field.
 
 ### ODTUClass (Moodle)
 
-Authenticates against `odtuclass{year}{semester}.metu.edu.tr`:
+Authenticates against `odtuclass{year}{semester}.metu.edu.tr` (summer uses the `sum` suffix):
 
 1. **GET** `/login/index.php` - fetch login page, extract CSRF `logintoken`
 2. **POST** `/login/index.php` - submit credentials
@@ -198,6 +199,8 @@ odtu assignments                # all assignments
 odtu deadlines -d 7             # what's due in the next 7 days
 odtu announcements 1234 -n 20   # latest 20 announcements for a course
 odtu contents 1234              # course sections & materials
+odtu download 1234              # download every attached file in a course
+odtu download 1234 5678 -o docs # download files from module 5678 into ./docs
 ```
 
 ### Student Portal data (university-wide academic record)

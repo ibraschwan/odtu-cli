@@ -1,6 +1,6 @@
 import chalk from 'chalk';
 import { select, input, password } from '@inquirer/prompts';
-import { ODTUClassClient } from '../client.js';
+import { ODTUClassClient, makeBaseUrl } from '../client.js';
 import { StudentClient } from '../student-client.js';
 import {
   showBanner, spinner, successBox,
@@ -54,7 +54,7 @@ export default function (program) {
         });
       }
 
-      const domain = `odtuclass${year}${semester}.metu.edu.tr`;
+      const domain = new URL(makeBaseUrl(year, semester)).host;
       console.log(`\n  ${chalk.green.bold(`${academicYearLabel(year)} ${semesterLabel(semester)}`)} ${semesterArt(semester)}`);
       console.log(`  ${chalk.dim(domain)}\n`);
 

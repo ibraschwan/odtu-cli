@@ -10,6 +10,7 @@ import grades from '../src/commands/grades.js';
 import assignments from '../src/commands/assignments.js';
 import deadlines from '../src/commands/deadlines.js';
 import contents from '../src/commands/contents.js';
+import download from '../src/commands/download.js';
 import forums from '../src/commands/forums.js';
 import announcements from '../src/commands/announcements.js';
 import dashboard from '../src/commands/dashboard.js';
@@ -24,7 +25,7 @@ const program = new Command();
 program
   .name('odtu')
   .description('ODTU CLI - access your METU courses from the terminal')
-  .version('2.0.0');
+  .version('2.0.1');
 
 login(program);
 logout(program);
@@ -35,6 +36,7 @@ grades(program);
 assignments(program);
 deadlines(program);
 contents(program);
+download(program);
 forums(program);
 announcements(program);
 dashboard(program);

@@ -27,13 +27,14 @@ export default function (program) {
 
       console.log(chalk.bold('\n  Assignments\n'));
 
-      const table = createTable(['Course', 'Assignment', 'Type', 'Due']);
+      const table = createTable(['Course', 'Assignment', 'Type', 'Module ID', 'Due']);
       for (const a of data) {
         const cname = courseNames[a.courseid] || `Course ${a.courseid}`;
         table.push([
           chalk.cyan(cname),
           chalk.bold(a.name || '?'),
           chalk.dim(a.modname || '?'),
+          chalk.dim(String(a.cmid || '-')),
           chalk.yellow(tsToStr(a.duedate)),
         ]);
       }
