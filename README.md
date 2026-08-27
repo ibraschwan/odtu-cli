@@ -53,7 +53,7 @@ odtu profile      # student profile + financial status
 | `odtu announcements <id>` | Announcements for one course (`-n 10` for more) |
 | `odtu contents <id>` | Course sections & activities as a tree |
 | `odtu download <id> [moduleId]` | Download PDFs and other attached course/assignment files (`-o <dir>`) |
-| `odtu materials <id>` | Archive files and announcements, including sites with disabled Moodle APIs |
+| `odtu materials <id>` | Archive files, announcements, and external links, including sites with disabled Moodle APIs |
 | `odtu forums <id>` | Forums in a course |
 | `odtu forums <id> -f <fid>` | Discussions in a specific forum |
 | `odtu dashboard` | Full overview: active courses + upcoming events |
