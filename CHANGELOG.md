@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.1.2 (2026-08-27)
+
+- Fix `odtu materials` announcement bodies: read `.post-content-container` and the
+  header byline, which recent Moodle themes use instead of `.posting`/`.author`.
+  Announcements previously archived as title and source URL only.
+- Record URL, H5P, LTI, and page activities in `links-index.md`, resolving each
+  URL activity to its external target and extracting inline Zoom passcodes.
+
 ## 2.1.1 (2026-08-06)
 
 - Add GitHub Actions CI across supported Node.js releases.

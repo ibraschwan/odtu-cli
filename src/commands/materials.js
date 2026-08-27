@@ -102,6 +102,41 @@ async function downloadActivity(client, url, directory, fallback, manifest, seen
   return saved;
 }
 
+async function resolveExternalUrl(client, url) {
+  const origin = new URL(client.baseUrl).origin;
+  const parsed = new URL(url, client.baseUrl);
+  const html = await client.getPageHtml(parsed.pathname + parsed.search);
+  const $ = cheerio.load(html);
+  const targets = new Set();
+  $('#region-main').find('a[href], iframe[src], object[data]').each((_, element) => {
+    const href = $(element).attr('href') || $(element).attr('src') || $(element).attr('data');
+    if (!href || !/^https?:/i.test(href)) return;
+    if (new URL(href).origin === origin) return;
+    targets.add(href);
+  });
+  return [...targets];
+}
+
+async function saveLinkIndex(courseRoot, links) {
+  if (!links.length) return 0;
+  const lines = ['# External Links & Interactive Activities', ''];
+  let section = null;
+  for (const link of links) {
+    if (link.section !== section) {
+      section = link.section;
+      lines.push(`## ${section}`, '');
+    }
+    lines.push(`- **${link.name}** (${link.type})`);
+    const passcode = link.name.match(/passcode:\s*([^)\s]+)/i)?.[1];
+    if (passcode) lines.push(`  - Passcode: \`${passcode}\``);
+    lines.push(`  - Activity: ${link.url}`);
+    for (const target of link.targets) lines.push(`  - Target: ${target}`);
+    lines.push('');
+  }
+  await writeFile(join(courseRoot, 'links-index.md'), lines.join('\n'));
+  return links.length;
+}
+
 async function saveAnnouncements(client, $, courseRoot, seen, manifest) {
   const forum = $('li.activity.modtype_forum').filter((_, element) => /announcement/i.test(clean($(element).text()))).first();
   const forumUrl = forum.find('a[href*="/mod/forum/view.php"]').first().attr('href');
@@ -126,9 +161,9 @@ async function saveAnnouncements(client, $, courseRoot, seen, manifest) {
     const html = await client.getPageHtml(`/mod/forum/discuss.php?d=${id}`);
     const page = cheerio.load(html);
     const post = page('.forumpost').first();
-    const subject = clean(post.find('.subject').first().text()) || discussion.title;
-    const author = clean(post.find('.author').first().text());
-    const body = post.find('.posting').first();
+    const subject = clean(post.find('.subject, h3.h6').first().text()) || discussion.title;
+    const author = clean(post.find('.author, header div.mb-3').first().text());
+    const body = post.find('.posting, .post-content-container').first();
     const paragraphs = [];
     body.find('p, li').each((_, item) => {
       const text = clean(page(item).text());
@@ -220,6 +255,7 @@ export default function (program) {
 
       const manifest = [];
       const seen = new Set();
+      const links = [];
       const indexLines = [`# ${pageTitle || `Course ${id}`} — Content`, ''];
       const sections = $('li.course-section').toArray();
       for (let index = 0; index < sections.length; index++) {
@@ -242,11 +278,23 @@ export default function (program) {
             } catch (error) {
               console.error(chalk.yellow(`  skipped ${name}: ${error.message}`));
             }
+          } else if (['url', 'hvp', 'lti', 'page'].includes(type)) {
+            progress.text = `Resolving ${name}...`;
+            let targets = [];
+            try {
+              targets = type === 'url' ? await resolveExternalUrl(client, url) : [];
+            } catch (error) {
+              console.error(chalk.yellow(`  unresolved ${name}: ${error.message}`));
+            }
+            links.push({ section: label, name, type, url, targets });
           }
         }
         indexLines.push('');
       }
       await writeFile(join(courseRoot, 'content-index.md'), indexLines.join('\n'));
+
+      progress.text = 'Saving link index...';
+      const linkCount = await saveLinkIndex(courseRoot, links);
 
       let announcementCount = 0;
       if (options.announcements) {
@@ -260,7 +308,7 @@ export default function (program) {
         progress.text = 'Converting and merging PDFs...';
         merged = await convertAndMerge(courseRoot, manifest, options.merge || null);
       }
-      progress.succeed(`Saved ${manifest.length} files and ${announcementCount} announcements`);
+      progress.succeed(`Saved ${manifest.length} files, ${linkCount} links and ${announcementCount} announcements`);
       console.log(chalk.cyan(`  ${courseRoot}`));
       if (merged) console.log(chalk.green(`  PDF: ${Array.isArray(merged) ? `${merged.length} weekly files` : merged}`));
     }));
