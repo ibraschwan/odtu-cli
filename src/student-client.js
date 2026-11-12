@@ -5,9 +5,10 @@
 
 import axios from 'axios';
 import * as cheerio from 'cheerio';
-import { readFileSync, writeFileSync, mkdirSync, existsSync, chmodSync } from 'fs';
+import { readFileSync, writeFileSync, mkdirSync, existsSync, chmodSync, unlinkSync } from 'fs';
 import { homedir } from 'os';
 import { join } from 'path';
+import { getPassword, savePassword, isMacKeychainSupported } from './keychain.js';
 
 const SESSION_DIR = join(homedir(), '.odtuclass');
 const STUDENT_SESSION_FILE = join(SESSION_DIR, 'student-session.json');
@@ -21,18 +22,31 @@ export class StudentClient {
     this.username = null;
     this.password = null;
     this._proxyCookies = {};
+    this._cachedInfoHtml = null;
   }
 
   // ── Session persistence ──────────────────────────────────────
 
-  saveSession() {
+  saveSession({ saveToKeychain = true } = {}) {
     mkdirSync(SESSION_DIR, { recursive: true });
-    writeFileSync(STUDENT_SESSION_FILE, JSON.stringify({
+    let storage = 'none';
+    if (saveToKeychain && this.username && this.password && isMacKeychainSupported()) {
+      if (savePassword(this.username, this.password)) {
+        storage = 'keychain';
+      }
+    }
+    const data = {
       token: this.token,
       username: this.username,
-      password: this.password,
-    }));
+    };
+    if (storage !== 'keychain' && this.password) {
+      data.password = this.password;
+      storage = 'session-file';
+    }
+    writeFileSync(STUDENT_SESSION_FILE, JSON.stringify(data));
     chmodSync(STUDENT_SESSION_FILE, 0o600);
+    this.credentialStorage = storage;
+    return storage;
   }
 
   loadSession() {
@@ -41,16 +55,34 @@ export class StudentClient {
       const data = JSON.parse(readFileSync(STUDENT_SESSION_FILE, 'utf-8'));
       this.token = data.token;
       this.username = data.username;
-      this.password = data.password;
-      return !!(this.token && this.username && this.password);
+      this.password = data.password || null;
+      // Migrate legacy plaintext password into macOS Keychain
+      if (data.password && this.username && isMacKeychainSupported()) {
+        if (savePassword(this.username, data.password)) {
+          delete data.password;
+          writeFileSync(STUDENT_SESSION_FILE, JSON.stringify(data));
+          chmodSync(STUDENT_SESSION_FILE, 0o600);
+        }
+      }
+      return !!(this.token && this.username);
     } catch {
       return false;
     }
   }
 
+  clearSession() {
+    if (existsSync(STUDENT_SESSION_FILE)) unlinkSync(STUDENT_SESSION_FILE);
+    this.token = null;
+    this.username = null;
+    this.password = null;
+    this._cachedInfoHtml = null;
+  }
+
   // ── Authentication ───────────────────────────────────────────
 
   async login(username, pwd) {
+    this._cachedInfoHtml = null;
+    this._proxyCookies = {};
     const resp = await axios.post(`${BASE}/sso/backend/request/user/signin`,
       { username, password: pwd },
       {
@@ -76,21 +108,22 @@ export class StudentClient {
 
   async _ensureToken() {
     if (this.token) {
-      // Check if token still works by hitting get_menu
+      // Check if token still works by hitting get_menu (without recursive retry)
       try {
-        await this._portalPost('/portal/backend/request/route/get_menu');
-        return;
+        const menu = await this._portalPost('/portal/backend/request/route/get_menu', null, { allowRetry: false });
+        if (menu && (menu.programs || menu.firstName)) return;
       } catch { /* token expired, re-login */ }
     }
-    if (!this.username || !this.password) {
-      throw new Error('Not logged in to student portal. Run: odtu login');
+    const pw = this.password || getPassword(this.username);
+    if (!this.username || !pw) {
+      throw new Error('Not logged in to student portal (or missing Keychain password). Run: odtu login');
     }
-    await this.login(this.username, this.password);
+    await this.login(this.username, pw);
   }
 
   // ── Portal API helpers ───────────────────────────────────────
 
-  async _portalPost(path, body = null) {
+  async _portalPost(path, body = null, { allowRetry = true, _retried = false } = {}) {
     const headers = {
       'Token': this.token,
       'Content-Type': 'application/json;charset=UTF-8',
@@ -99,6 +132,14 @@ export class StudentClient {
       'Referer': `${BASE}/portal/`,
     };
     const resp = await axios.post(`${BASE}${path}`, body, { headers, validateStatus: () => true });
+    if (resp.headers['token-valid'] === '0' || resp.status === 401) {
+      const pw = this.password || getPassword(this.username);
+      if (allowRetry && !_retried && this.username && pw) {
+        await this.login(this.username, pw);
+        return await this._portalPost(path, body, { allowRetry: false, _retried: true });
+      }
+      throw new Error('Portal token expired');
+    }
     if (resp.status !== 200) throw new Error(`Portal API error: ${resp.status}`);
     return resp.data;
   }
@@ -112,7 +153,10 @@ export class StudentClient {
   }
 
   /** Fetch the full Student Information HTML page (app 61) */
-  async _getStudentInfoHtml() {
+  async _getStudentInfoHtml(forceRefresh = false) {
+    if (this._cachedInfoHtml && !forceRefresh) {
+      return this._cachedInfoHtml;
+    }
     await this._ensureToken();
 
     // Step 1: Get pkg token
@@ -162,7 +206,8 @@ export class StudentClient {
       maxRedirects: 0,
     });
 
-    return getResp.data;
+    this._cachedInfoHtml = getResp.data;
+    return this._cachedInfoHtml;
   }
 
   // ── High-level parsed data ───────────────────────────────────
@@ -523,6 +568,17 @@ function parseFinancial($) {
 export function getStudentClient() {
   const client = new StudentClient();
   if (!client.loadSession()) {
+    // Fall back to username from ODTUClass session + Keychain if student-session.json is absent
+    const moodleSessionFile = join(SESSION_DIR, 'session.json');
+    if (existsSync(moodleSessionFile)) {
+      try {
+        const m = JSON.parse(readFileSync(moodleSessionFile, 'utf-8'));
+        if (m.username && getPassword(m.username)) {
+          client.username = m.username;
+          return client;
+        }
+      } catch { /* ignore */ }
+    }
     throw new Error('Not logged in to student portal. Run: odtu login');
   }
   return client;

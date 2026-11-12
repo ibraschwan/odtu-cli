@@ -7,6 +7,7 @@ import * as cheerio from 'cheerio';
 import { readFileSync, writeFileSync, mkdirSync, unlinkSync, existsSync, chmodSync } from 'fs';
 import { homedir } from 'os';
 import { join } from 'path';
+import { getPassword, hasPassword, savePassword, isMacKeychainSupported } from './keychain.js';
 
 const SESSION_DIR = join(homedir(), '.odtuclass');
 const SESSION_FILE = join(SESSION_DIR, 'session.json');
@@ -125,19 +126,30 @@ export class ODTUClassClient {
 
   // ── Session persistence ────────────────────────────────────────
 
-  saveSession() {
+  saveSession({ saveToKeychain = true } = {}) {
     mkdirSync(SESSION_DIR, { recursive: true });
+    let storage = 'none';
+    if (saveToKeychain && this.username && this.password && isMacKeychainSupported()) {
+      if (savePassword(this.username, this.password)) {
+        storage = 'keychain';
+      }
+    }
     const data = {
       cookies: this.cookies,
       sesskey: this.sesskey,
       user_id: this.userId,
       username: this.username,
-      password: this.password,
       year: this.year,
       semester: this.semester,
     };
+    if (storage !== 'keychain' && this.password) {
+      data.password = this.password;
+      storage = 'session-file';
+    }
     writeFileSync(SESSION_FILE, JSON.stringify(data));
     chmodSync(SESSION_FILE, 0o600);
+    this.credentialStorage = storage;
+    return storage;
   }
 
   loadSession() {
@@ -153,6 +165,14 @@ export class ODTUClassClient {
       this.semester = data.semester;
       if (this.year && this.semester) {
         this.baseUrl = makeBaseUrl(this.year, this.semester);
+      }
+      // Migrate legacy plaintext password from session.json into macOS Keychain
+      if (data.password && this.username && isMacKeychainSupported()) {
+        if (savePassword(this.username, data.password)) {
+          delete data.password;
+          writeFileSync(SESSION_FILE, JSON.stringify(data));
+          chmodSync(SESSION_FILE, 0o600);
+        }
       }
       return !!(this.sesskey && this.baseUrl);
     } catch {
@@ -228,10 +248,18 @@ export class ODTUClassClient {
   }
 
   async isAuthenticated() {
-    if (!this.sesskey) return false;
+    if (!this.sesskey || !this.baseUrl) return false;
     try {
-      const result = await this.apiCall('core_webservice_get_site_info', {});
-      return 'userid' in result;
+      const result = await this._apiCallRaw('core_webservice_get_site_info', {});
+      if (result && 'userid' in result) return true;
+    } catch {
+      // Some ODTUClass instances disable core_webservice_get_site_info; verify via /my/
+    }
+    try {
+      const resp = await this._request('GET', `${this.baseUrl}/my/`);
+      if ((resp.finalUrl || '').includes('/login/index.php')) return false;
+      this._extractSessionInfo(resp.data);
+      return !!this.sesskey;
     } catch {
       return false;
     }
@@ -246,16 +274,29 @@ export class ODTUClassClient {
 
   // ── Auto re-login ─────────────────────────────────────────────
 
+  _resolvePassword() {
+    return this.password || getPassword(this.username);
+  }
+
   _canAutoReLogin() {
-    return !!(this.username && this.password && this.year && this.semester);
+    return !!(
+      this.username &&
+      this.year &&
+      this.semester &&
+      (this.password || hasPassword(this.username))
+    );
   }
 
   async _autoReLogin() {
+    const pw = this._resolvePassword();
+    if (!pw) {
+      throw new AuthError('No password available in Keychain or environment. Run: odtu login');
+    }
     this.cookies = {};
     this.sesskey = null;
     this.userId = null;
     this.baseUrl = makeBaseUrl(this.year, this.semester);
-    await this.login(this.username, this.password);
+    await this.login(this.username, pw);
   }
 
   _isAuthRelatedError(e) {
@@ -310,8 +351,22 @@ export class ODTUClassClient {
     return result.data !== undefined ? result.data : result;
   }
 
-  async apiBatch(calls) {
+  async apiBatch(calls, _retried = false) {
     if (!calls.length) return [];
+    try {
+      return await this._apiBatchRaw(calls);
+    } catch (e) {
+      if (!_retried && this._canAutoReLogin() && this._isAuthRelatedError(e)) {
+        try {
+          await this._autoReLogin();
+          return await this._apiBatchRaw(calls);
+        } catch { /* re-login failed, throw original */ }
+      }
+      throw e;
+    }
+  }
+
+  async _apiBatchRaw(calls) {
     const methodNames = calls.map(c => c[0]).join(',');
     const body = calls.map(([name, args], i) => ({ index: i, methodname: name, args }));
 
@@ -321,6 +376,10 @@ export class ODTUClassClient {
       body,
       { json: true, params: { sesskey: this.sesskey, info: methodNames } },
     );
+
+    if (typeof resp.data === 'string' || !Array.isArray(resp.data)) {
+      throw new APIError('Unexpected response from server');
+    }
 
     return resp.data.map(item => {
       if (item.error) {

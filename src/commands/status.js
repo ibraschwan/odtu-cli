@@ -16,7 +16,7 @@ export default function (program) {
       const s = spinner('Checking session...').start();
       let valid = await client.isAuthenticated();
 
-      // Auto re-login if session expired and credentials are saved
+      // Auto re-login if session expired and credentials are saved (Keychain/env)
       if (!valid && client._canAutoReLogin()) {
         s.text = 'Session expired, re-authenticating...';
         try {
@@ -31,7 +31,7 @@ export default function (program) {
         try {
           const info = await client.getSiteInfo();
           fullname = info.fullname || client.username;
-        } catch { /* ignore */ }
+        } catch { /* core_webservice_get_site_info may be disabled */ }
 
         infoBox(
           `${chalk.green.bold('Logged in')}\n` +
@@ -42,7 +42,6 @@ export default function (program) {
         );
       } else {
         console.log(chalk.red('Session expired. Run: ') + chalk.cyan('odtu login'));
-        client.clearSession();
       }
     }));
 }
