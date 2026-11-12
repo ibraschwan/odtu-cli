@@ -45,17 +45,21 @@ odtu profile      # student profile + financial status
 | `odtu courses` | List enrolled courses (`-f inprogress\|past\|future\|all`) |
 | `odtu grades` | Grades overview across all courses |
 | `odtu grades <id>` | Detailed grade breakdown for a course |
-| `odtu assignments` | All assignments across courses |
+| `odtu assignments` | All assignments across courses (with `cmid` & submission status) |
 | `odtu assignments <id>` | Assignments for a specific course |
+| `odtu assignment <cmid>` | Full assignment instructions, attachments, due date, submission status |
 | `odtu deadlines` | Upcoming events, next 14 days (`-d 30` for 30 days) |
 | `odtu deadlines <id>` | Deadlines for a specific course |
 | `odtu announcements` | Announcements across all active courses |
 | `odtu announcements <id>` | Announcements for one course (`-n 10` for more) |
-| `odtu contents <id>` | Course sections & activities as a tree |
-| `odtu download <id> [moduleId]` | Download PDFs and other attached course/assignment files (`-o <dir>`) |
+| `odtu contents <id>` | Course sections & activities (with HTML fallback when WS APIs are restricted) |
+| `odtu download <id> [moduleId]` | Download PDFs and attached course/assignment/page files (`-o <dir>`) |
 | `odtu materials <id>` | Archive files, announcements, and external links, including sites with disabled Moodle APIs |
 | `odtu forums <id>` | Forums in a course |
-| `odtu forums <id> -f <fid>` | Discussions in a specific forum |
+| `odtu forums <id> -f <fid>` | Discussions in a specific forum (`-d <did>` for posts) |
+| `odtu page <cmid>` | Read a Moodle Page activity (syllabus, exam rules, links, files) |
+| `odtu attendance [id]` | Show attendance sessions and summary |
+| `odtu fetch <urlOrPath>` | Fetch any authenticated ODTUClass URL/path (text/links or `--out <file>`) |
 | `odtu dashboard` | Full overview: active courses + upcoming events |
 
 ### Student Portal (student.metu.edu.tr)
@@ -79,14 +83,11 @@ odtu profile      # student profile + financial status
 
 ## Features
 
-- Two data sources in one CLI: ODTUClass (Moodle) + Student Portal
-- Arrow-key year & semester selection (no typing numbers)
-- Dithering ASCII banner animation on startup
-- Auto re-login when session expires
-- Gradient-colored terminal UI with animated spinners
-- GPA visualization with progress bars
-- Curriculum completion tracking with percentage
-- Color-coded grades (green for passing, red for failing)
+- Two data sources in one CLI: **ODTUClass (Moodle)** + **Student Portal (SAIS)**
+- Global `--json` flag across every command for clean agent/script consumption
+- Transparent HTML fallback when METU restricts Moodle Web Service endpoints (`contents`, `assignments`, `forums`, `announcements`, `download`, `materials`)
+- Arrow-key year & semester selection, auto re-login when session expires
+- Gradient-colored terminal UI, GPA progress bars, curriculum tracker, color-coded grades
 
 ## Security & Data Storage
 
@@ -122,12 +123,6 @@ Two files in `~/.odtuclass/`:
 - **Local only** - credentials never leave your machine. They are sent only to `*.metu.edu.tr` over HTTPS.
 - **No telemetry** - zero analytics, zero tracking, zero external calls.
 - **`odtu logout` wipes everything** - deletes all session files entirely.
-
-### Why the password is stored
-
-Both Moodle sessions and Student Portal JWTs expire. Without the saved password, you'd have to run `odtu login` every time. With it, the CLI silently re-authenticates in the background.
-
-To disable: edit `~/.odtuclass/session.json` and remove the `password` field.
 
 ## How It Works
 
@@ -217,12 +212,11 @@ odtu profile       # student info, registered courses, tuition debt
 
 ### Programmatic notes
 
+- Pass global `--json` on any command for structured JSON output (and JSON `{ ok: false, error, type }` on stderr on failure)
 - All commands exit `0` on success, `1` on error
-- Error output goes to stderr with prefixes: `Auth error:`, `API error:`, `Error:`
-- Session files are at `~/.odtuclass/` (JSON, readable)
-- `odtu login` requires an interactive terminal (TTY) for arrow-key prompts
+- Session files are at `~/.odtuclass/` (`0600`, readable JSON)
+- `odtu login` requires an interactive terminal (TTY) for arrow-key prompts unless `-u`/`-p`/`-y`/`-s` are supplied
 - If sessions expire and credentials are saved, API calls auto-retry after re-login
-- Course IDs are integers, visible in `odtu courses` output
 
 ### Data pipeline example
 

@@ -27,7 +27,22 @@ const BANNER_ART = [
   '        :::     welcome to odtu cli v2.0         built with <3 by ibracob.dev',
 ];
 
+let jsonMode = false;
+
+export function setJsonMode(enabled) {
+  jsonMode = !!enabled;
+}
+
+export function isJsonMode() {
+  return jsonMode;
+}
+
+export function emitJson(data) {
+  console.log(JSON.stringify(data, null, 2));
+}
+
 export async function showBanner({ animate = true } = {}) {
+  if (jsonMode) return;
   const lines = BANNER_ART;
   const full = lines.join('\n');
 
@@ -97,6 +112,17 @@ export async function typewriter(text, delay = 30) {
 }
 
 export function spinner(text) {
+  if (jsonMode) {
+    const noop = {
+      text: '',
+      start() { return noop; },
+      stop() { return noop; },
+      succeed() { return noop; },
+      warn() { return noop; },
+      fail() { return noop; },
+    };
+    return noop;
+  }
   return ora({ text, spinner: 'dots' });
 }
 
@@ -211,7 +237,13 @@ export function handleErrors(fn) {
     try {
       await fn(...args);
     } catch (e) {
-      if (e.name === 'AuthError') {
+      if (jsonMode) {
+        console.error(JSON.stringify({
+          ok: false,
+          error: e.message,
+          type: e.name || 'Error',
+        }));
+      } else if (e.name === 'AuthError') {
         console.error(chalk.red.bold('Auth error: ') + e.message);
       } else if (e.name === 'APIError') {
         console.error(chalk.red.bold('API error: ') + e.message);

@@ -1,6 +1,6 @@
 import chalk from 'chalk';
 import { getStudentClient } from '../student-client.js';
-import { handleErrors, spinner, createTable } from '../ui.js';
+import { handleErrors, spinner, createTable, isJsonMode, emitJson } from '../ui.js';
 
 export default function (program) {
   program
@@ -12,6 +12,11 @@ export default function (program) {
       const s = spinner('Fetching curriculum...').start();
       const data = await client.getCurriculum();
       s.stop();
+
+      if (isJsonMode()) {
+        emitJson({ semesters: data });
+        return;
+      }
 
       if (!data.length) {
         console.log(chalk.yellow('No curriculum data found.'));

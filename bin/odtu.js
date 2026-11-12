@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { Command } from 'commander';
+import { setJsonMode } from '../src/ui.js';
 import login from '../src/commands/login.js';
 import logout from '../src/commands/logout.js';
 import status from '../src/commands/status.js';
@@ -8,12 +9,16 @@ import switchCmd from '../src/commands/switch.js';
 import courses from '../src/commands/courses.js';
 import grades from '../src/commands/grades.js';
 import assignments from '../src/commands/assignments.js';
+import assignment from '../src/commands/assignment.js';
 import deadlines from '../src/commands/deadlines.js';
 import contents from '../src/commands/contents.js';
 import download from '../src/commands/download.js';
 import materials from '../src/commands/materials.js';
 import forums from '../src/commands/forums.js';
 import announcements from '../src/commands/announcements.js';
+import page from '../src/commands/page.js';
+import attendance from '../src/commands/attendance.js';
+import fetchCmd from '../src/commands/fetch.js';
 import dashboard from '../src/commands/dashboard.js';
 import transcript from '../src/commands/transcript.js';
 import gpa from '../src/commands/gpa.js';
@@ -26,7 +31,13 @@ const program = new Command();
 program
   .name('odtu')
   .description('ODTU CLI - access your METU courses from the terminal')
-  .version('2.1.1');
+  .version('2.1.1')
+  .option('--json', 'Output clean machine-readable JSON for agents');
+
+program.hook('preAction', (thisCommand) => {
+  const opts = thisCommand.optsWithGlobals();
+  setJsonMode(!!opts.json);
+});
 
 login(program);
 logout(program);
@@ -35,12 +46,16 @@ switchCmd(program);
 courses(program);
 grades(program);
 assignments(program);
+assignment(program);
 deadlines(program);
 contents(program);
 download(program);
 materials(program);
 forums(program);
 announcements(program);
+page(program);
+attendance(program);
+fetchCmd(program);
 dashboard(program);
 transcript(program);
 gpa(program);

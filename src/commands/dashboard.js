@@ -2,7 +2,7 @@ import chalk from 'chalk';
 import boxen from 'boxen';
 import { getClient } from '../client.js';
 import {
-  showBanner, spinner, createTable, tsToStr, handleErrors,
+  showBanner, spinner, createTable, tsToStr, handleErrors, isJsonMode, emitJson,
 } from '../ui.js';
 
 export default function (program) {
@@ -13,10 +13,29 @@ export default function (program) {
       const client = getClient();
 
       const s = spinner('Loading dashboard...').start();
-      const coursesData = await client.getCourses('inprogress');
+      const coursesData = await client.getCourses('all');
       const now = Math.floor(Date.now() / 1000);
       const eventsData = await client.getCalendarEvents(now, now + 7 * 86400, 10);
       s.stop();
+
+      const events = (eventsData.events || []).sort((a, b) => (a.timesort || 0) - (b.timesort || 0));
+
+      if (isJsonMode()) {
+        emitJson({
+          semester: client.semesterDisplay,
+          username: client.username,
+          courses: coursesData.map(c => ({ id: c.id, fullname: c.fullname })),
+          upcomingEvents: events.map(ev => ({
+            id: ev.id,
+            name: ev.name || '?',
+            timesort: ev.timesort || 0,
+            date: tsToStr(ev.timesort),
+            courseName: ev.course?.fullname || '-',
+            url: ev.url || '',
+          })),
+        });
+        return;
+      }
 
       await showBanner({ animate: false });
 
@@ -49,12 +68,10 @@ export default function (program) {
       console.log();
 
       // Upcoming events
-      const events = eventsData.events || [];
       if (events.length) {
         console.log(chalk.bold('  Upcoming (7 days)\n'));
         const table = createTable(['Date', 'Event'], { noBorder: true });
-        const sorted = events.sort((a, b) => (a.timesort || 0) - (b.timesort || 0));
-        for (const ev of sorted) {
+        for (const ev of events) {
           table.push([
             chalk.yellow(tsToStr(ev.timesort)),
             chalk.bold(ev.name || '?'),

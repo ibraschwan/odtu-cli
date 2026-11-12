@@ -1,6 +1,6 @@
 import chalk from 'chalk';
 import { getClient } from '../client.js';
-import { handleErrors } from '../ui.js';
+import { handleErrors, isJsonMode, emitJson } from '../ui.js';
 
 export default function (program) {
   program
@@ -9,6 +9,10 @@ export default function (program) {
     .action(handleErrors(async () => {
       const client = getClient(false);
       client.clearSession();
+      if (isJsonMode()) {
+        emitJson({ ok: true, loggedOut: true });
+        return;
+      }
       console.log(chalk.yellow('Logged out.'));
     }));
 }

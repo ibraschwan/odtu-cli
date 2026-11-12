@@ -1,6 +1,6 @@
 import chalk from 'chalk';
 import { getStudentClient } from '../student-client.js';
-import { handleErrors, spinner, createTable } from '../ui.js';
+import { handleErrors, spinner, createTable, isJsonMode, emitJson } from '../ui.js';
 
 export default function (program) {
   program
@@ -12,6 +12,18 @@ export default function (program) {
       const s = spinner('Fetching transcript...').start();
       const data = await client.getTranscript();
       s.stop();
+
+      if (isJsonMode()) {
+        const semesters = data.semesters
+          .filter(sem => sem.summary && sem.summary.gpa)
+          .map(sem => ({ name: sem.name, ...sem.summary }));
+        const last = [...data.semesters].reverse().find(sem => sem.summary && sem.summary.cumGpa);
+        emitJson({
+          semesters,
+          current: last ? last.summary : null,
+        });
+        return;
+      }
 
       if (!data.semesters.length) {
         console.log(chalk.yellow('No GPA data found.'));
