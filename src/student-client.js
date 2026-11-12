@@ -29,19 +29,24 @@ export class StudentClient {
 
   saveSession({ saveToKeychain = true } = {}) {
     mkdirSync(SESSION_DIR, { recursive: true });
-    let storedInKeychain = false;
+    let storage = 'none';
     if (saveToKeychain && this.username && this.password && isMacKeychainSupported()) {
-      storedInKeychain = savePassword(this.username, this.password);
+      if (savePassword(this.username, this.password)) {
+        storage = 'keychain';
+      }
     }
     const data = {
       token: this.token,
       username: this.username,
     };
-    if (!storedInKeychain && !isMacKeychainSupported() && this.password) {
+    if (storage !== 'keychain' && this.password) {
       data.password = this.password;
+      storage = 'session-file';
     }
     writeFileSync(STUDENT_SESSION_FILE, JSON.stringify(data));
     chmodSync(STUDENT_SESSION_FILE, 0o600);
+    this.credentialStorage = storage;
+    return storage;
   }
 
   loadSession() {
@@ -76,6 +81,8 @@ export class StudentClient {
   // ── Authentication ───────────────────────────────────────────
 
   async login(username, pwd) {
+    this._cachedInfoHtml = null;
+    this._proxyCookies = {};
     const resp = await axios.post(`${BASE}/sso/backend/request/user/signin`,
       { username, password: pwd },
       {
@@ -101,9 +108,9 @@ export class StudentClient {
 
   async _ensureToken() {
     if (this.token) {
-      // Check if token still works by hitting get_menu
+      // Check if token still works by hitting get_menu (without recursive retry)
       try {
-        const menu = await this._portalPost('/portal/backend/request/route/get_menu');
+        const menu = await this._portalPost('/portal/backend/request/route/get_menu', null, { allowRetry: false });
         if (menu && (menu.programs || menu.firstName)) return;
       } catch { /* token expired, re-login */ }
     }
@@ -116,7 +123,7 @@ export class StudentClient {
 
   // ── Portal API helpers ───────────────────────────────────────
 
-  async _portalPost(path, body = null) {
+  async _portalPost(path, body = null, { allowRetry = true, _retried = false } = {}) {
     const headers = {
       'Token': this.token,
       'Content-Type': 'application/json;charset=UTF-8',
@@ -126,6 +133,11 @@ export class StudentClient {
     };
     const resp = await axios.post(`${BASE}${path}`, body, { headers, validateStatus: () => true });
     if (resp.headers['token-valid'] === '0' || resp.status === 401) {
+      const pw = this.password || getPassword(this.username);
+      if (allowRetry && !_retried && this.username && pw) {
+        await this.login(this.username, pw);
+        return await this._portalPost(path, body, { allowRetry: false, _retried: true });
+      }
       throw new Error('Portal token expired');
     }
     if (resp.status !== 200) throw new Error(`Portal API error: ${resp.status}`);

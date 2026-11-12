@@ -128,9 +128,11 @@ export class ODTUClassClient {
 
   saveSession({ saveToKeychain = true } = {}) {
     mkdirSync(SESSION_DIR, { recursive: true });
-    let storedInKeychain = false;
+    let storage = 'none';
     if (saveToKeychain && this.username && this.password && isMacKeychainSupported()) {
-      storedInKeychain = savePassword(this.username, this.password);
+      if (savePassword(this.username, this.password)) {
+        storage = 'keychain';
+      }
     }
     const data = {
       cookies: this.cookies,
@@ -140,11 +142,14 @@ export class ODTUClassClient {
       year: this.year,
       semester: this.semester,
     };
-    if (!storedInKeychain && !isMacKeychainSupported() && this.password) {
+    if (storage !== 'keychain' && this.password) {
       data.password = this.password;
+      storage = 'session-file';
     }
     writeFileSync(SESSION_FILE, JSON.stringify(data));
     chmodSync(SESSION_FILE, 0o600);
+    this.credentialStorage = storage;
+    return storage;
   }
 
   loadSession() {

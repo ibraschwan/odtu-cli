@@ -15,14 +15,32 @@ export default function (program) {
       const studentClient = new StudentClient();
       studentClient.loadSession();
 
-      const username = client.username || studentClient.username;
+      const usernames = [...new Set([client.username, studentClient.username].filter(Boolean))];
       client.clearSession();
       studentClient.clearSession();
 
-      if (!options.keepKeychain && username) {
-        deletePassword(username);
+      const keychainFailed = [];
+      if (!options.keepKeychain) {
+        for (const username of usernames) {
+          const res = deletePassword(username);
+          if (!res.ok) {
+            keychainFailed.push({ username, ...res });
+          }
+        }
+      }
+
+      if (keychainFailed.length > 0) {
+        process.exitCode = 1;
       }
 
       console.log(chalk.yellow('Logged out (ODTUClass + Student Portal sessions cleared).'));
+      for (const failure of keychainFailed) {
+        console.error(
+          chalk.red(`Warning: failed to remove Keychain entry for ${failure.username}: ${failure.error}`),
+        );
+        console.error(
+          chalk.dim(`Retry manually: security delete-generic-password -a "${failure.username}" -s odtu-cli-metu`),
+        );
+      }
     }));
 }
