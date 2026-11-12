@@ -1,7 +1,9 @@
 import chalk from 'chalk';
+import { readFileSync } from 'fs';
 import { select, input, password } from '@inquirer/prompts';
 import { ODTUClassClient, makeBaseUrl } from '../client.js';
 import { StudentClient } from '../student-client.js';
+import { hasPassword, isMacKeychainSupported } from '../keychain.js';
 import {
   showBanner, spinner, successBox,
   guessSemester, semesterLabel, semesterArt, handleErrors,
@@ -11,10 +13,11 @@ import {
 export default function (program) {
   program
     .command('login')
-    .description('Log in to ODTU with interactive setup')
+    .description('Log in to ODTU (stores password in macOS Keychain when available)')
     .option('-u, --username <username>', 'METU username')
-    .option('-p, --password <password>', 'METU password')
-    .option('-y, --year <year>', 'Academic start year (e.g. 2025 for 2025-2026)', parseInt)
+    .option('-p, --password <password>', 'METU password (prefer --password-stdin or interactive)')
+    .option('--password-stdin', 'Read password from stdin (avoids shell history)')
+    .option('-y, --year <year>', 'Academic start year (e.g. 2026 for 2026-2027)', parseInt)
     .option('-s, --semester <semester>', 'Semester: f=Fall, s=Spring, u=Summer')
     .action(handleErrors(async (options) => {
       // ── Animated ASCII Banner ──────────────────────────────
@@ -62,7 +65,13 @@ export default function (program) {
       console.log(chalk.cyan.bold('  Step 2/3 ') + chalk.dim('Enter your METU credentials\n'));
 
       const username = options.username || await input({ message: 'METU Username' });
-      const pw = options.password || await password({ message: 'Password', mask: '*' });
+      let pw = options.password;
+      if (!pw && options.passwordStdin) {
+        pw = readFileSync(0, 'utf8').replace(/\r?\n$/, '');
+      }
+      if (!pw) {
+        pw = await password({ message: 'Password', mask: '*' });
+      }
 
       // ── Step 4: Connect ───────────────────────────────────
       console.log('\n' + chalk.cyan.bold('  Step 3/3 ') + chalk.dim('Connecting\n'));
@@ -95,12 +104,17 @@ export default function (program) {
       const portalLine = studentOk
         ? `  Portal:    ${chalk.green('student.metu.edu.tr')}\n`
         : `  Portal:    ${chalk.dim('not connected')}\n`;
+      const keychainStored = isMacKeychainSupported() && hasPassword(username);
+      const credLine = keychainStored
+        ? `  Keychain:  ${chalk.green('stored in macOS Keychain (odtu-cli-metu)')}\n`
+        : `  Password:  ${chalk.dim('session file')}\n`;
 
       successBox(
         `${chalk.green.bold(`Welcome, ${fullname}!`)}\n\n` +
         `  Semester:  ${chalk.bold(`${academicYearLabel(year)} ${semesterLabel(semester)}`)}\n` +
         `  Domain:    ${chalk.dim(domain)}\n` +
         portalLine +
+        credLine +
         `  Session:   ${chalk.dim('saved to ~/.odtuclass/')}\n\n` +
         `${chalk.dim('Quick start:')}\n` +
         `  ${chalk.cyan('odtu courses')}       List your courses\n` +
