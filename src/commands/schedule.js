@@ -1,6 +1,6 @@
 import chalk from 'chalk';
 import { getStudentClient } from '../student-client.js';
-import { handleErrors, spinner } from '../ui.js';
+import { handleErrors, spinner, isJsonMode, emitJson } from '../ui.js';
 import Table from 'cli-table3';
 
 export default function (program) {
@@ -13,6 +13,11 @@ export default function (program) {
       const s = spinner('Fetching course schedule...').start();
       const data = await client.getCourseSchedule();
       s.stop();
+
+      if (isJsonMode()) {
+        emitJson({ schedule: data });
+        return;
+      }
 
       if (!data.length) {
         console.log(chalk.yellow('No schedule data found. Schedule may not be available yet for this semester.'));

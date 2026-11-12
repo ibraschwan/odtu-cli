@@ -1,6 +1,6 @@
 import chalk from 'chalk';
 import { getStudentClient } from '../student-client.js';
-import { handleErrors, spinner, successBox, createTable } from '../ui.js';
+import { handleErrors, spinner, successBox, createTable, isJsonMode, emitJson } from '../ui.js';
 
 export default function (program) {
   program
@@ -15,6 +15,11 @@ export default function (program) {
         client.getAllStudentInfo(),
       ]);
       s.stop();
+
+      if (isJsonMode()) {
+        emitJson({ profile, ...allInfo });
+        return;
+      }
 
       const { transcript, semester, financial } = allInfo;
       const st = transcript.student;

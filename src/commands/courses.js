@@ -1,6 +1,6 @@
 import chalk from 'chalk';
 import { getClient } from '../client.js';
-import { handleErrors, spinner, createTable } from '../ui.js';
+import { handleErrors, spinner, createTable, isJsonMode, emitJson } from '../ui.js';
 
 export default function (program) {
   program
@@ -13,6 +13,22 @@ export default function (program) {
       const s = spinner('Fetching courses...').start();
       const courseList = await client.getCourses(options.filter);
       s.stop();
+
+      if (isJsonMode()) {
+        emitJson({
+          semester: client.semesterDisplay,
+          baseUrl: client.baseUrl,
+          courses: courseList.map(c => ({
+            id: c.id,
+            fullname: c.fullname,
+            shortname: c.shortname || c.fullname,
+            category: c.coursecategory || '',
+            favourite: !!c.isfavourite,
+            url: `${client.baseUrl}/course/view.php?id=${c.id}`,
+          })),
+        });
+        return;
+      }
 
       if (!courseList.length) {
         console.log(chalk.yellow('No courses found.'));

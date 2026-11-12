@@ -1,6 +1,6 @@
 import chalk from 'chalk';
 import { getClient } from '../client.js';
-import { handleErrors, spinner, moduleIcon } from '../ui.js';
+import { handleErrors, spinner, moduleIcon, isJsonMode, emitJson } from '../ui.js';
 
 export default function (program) {
   program
@@ -8,10 +8,16 @@ export default function (program) {
     .description('Show sections and activities for a course')
     .action(handleErrors(async (courseId) => {
       const client = getClient();
+      const parsedId = parseInt(courseId, 10);
 
       const s = spinner('Fetching course contents...').start();
-      const sections = await client.getCourseContents(parseInt(courseId));
+      const sections = await client.getCourseContents(parsedId);
       s.stop();
+
+      if (isJsonMode()) {
+        emitJson({ courseId: parsedId, sections });
+        return;
+      }
 
       if (!sections.length) {
         console.log(chalk.yellow('No content found.'));

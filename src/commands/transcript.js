@@ -1,6 +1,6 @@
 import chalk from 'chalk';
 import { getStudentClient } from '../student-client.js';
-import { handleErrors, spinner, createTable, infoBox } from '../ui.js';
+import { handleErrors, spinner, createTable, infoBox, isJsonMode, emitJson } from '../ui.js';
 
 export default function (program) {
   program
@@ -12,6 +12,11 @@ export default function (program) {
       const s = spinner('Fetching transcript from student portal...').start();
       const data = await client.getTranscript();
       s.stop();
+
+      if (isJsonMode()) {
+        emitJson(data);
+        return;
+      }
 
       if (!data.semesters.length) {
         console.log(chalk.yellow('No transcript data found.'));

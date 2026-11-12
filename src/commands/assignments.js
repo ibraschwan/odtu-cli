@@ -1,6 +1,6 @@
 import chalk from 'chalk';
 import { getClient } from '../client.js';
-import { handleErrors, spinner, createTable, tsToStr } from '../ui.js';
+import { handleErrors, spinner, createTable, tsToStr, isJsonMode, emitJson } from '../ui.js';
 
 export default function (program) {
   program
@@ -13,12 +13,22 @@ export default function (program) {
       const allCourses = await client.getCourses();
       s.text = 'Fetching assignments...';
 
-      const courseIds = courseId ? [parseInt(courseId)] : allCourses.map(c => c.id);
+      const courseIds = courseId ? [parseInt(courseId, 10)] : allCourses.map(c => c.id);
       const courseNames = {};
       for (const c of allCourses) courseNames[c.id] = c.fullname;
 
       const data = await client.getAssignments(courseIds);
       s.stop();
+
+      if (isJsonMode()) {
+        emitJson({
+          assignments: data.map(a => ({
+            ...a,
+            courseName: courseNames[a.courseid] || `Course ${a.courseid}`,
+          })),
+        });
+        return;
+      }
 
       if (!data.length) {
         console.log(chalk.yellow('No assignments found.'));
@@ -27,15 +37,18 @@ export default function (program) {
 
       console.log(chalk.bold('\n  Assignments\n'));
 
-      const table = createTable(['Course', 'Assignment', 'Type', 'Module ID', 'Due']);
+      const table = createTable(['Course', 'Assignment', 'Type', 'Module ID', 'Due', 'Status', 'Grade']);
       for (const a of data) {
         const cname = courseNames[a.courseid] || `Course ${a.courseid}`;
+        const dueDisplay = a.duedate ? tsToStr(a.duedate) : (a.dueDateText || '-');
         table.push([
           chalk.cyan(cname),
           chalk.bold(a.name || '?'),
           chalk.dim(a.modname || '?'),
           chalk.dim(String(a.cmid || '-')),
-          chalk.yellow(tsToStr(a.duedate)),
+          chalk.yellow(dueDisplay),
+          a.submissionStatus || '-',
+          a.grade || '-',
         ]);
       }
       console.log(table.toString());

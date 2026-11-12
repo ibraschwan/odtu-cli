@@ -1,6 +1,6 @@
 import chalk from 'chalk';
 import { getClient } from '../client.js';
-import { handleErrors, spinner, createTable } from '../ui.js';
+import { handleErrors, spinner, createTable, isJsonMode, emitJson } from '../ui.js';
 
 export default function (program) {
   program
@@ -8,7 +8,7 @@ export default function (program) {
     .description('Show grades. Provide COURSE_ID for detailed grades, or omit for overview')
     .action(handleErrors(async (courseId) => {
       const client = getClient();
-      const cid = courseId ? parseInt(courseId) : null;
+      const cid = courseId ? parseInt(courseId, 10) : null;
 
       if (cid) {
         await showCourseGrades(client, cid);
@@ -22,6 +22,11 @@ async function showGradesOverview(client) {
   const s = spinner('Fetching grades overview...').start();
   const gradeList = await client.getGradesOverview();
   s.stop();
+
+  if (isJsonMode()) {
+    emitJson({ semester: client.semesterDisplay, grades: gradeList });
+    return;
+  }
 
   if (!gradeList.length) {
     console.log(chalk.yellow('No grades available.'));
@@ -46,6 +51,11 @@ async function showCourseGrades(client, courseId) {
   const s = spinner('Fetching course grades...').start();
   const items = await client.getCourseGrades(courseId);
   s.stop();
+
+  if (isJsonMode()) {
+    emitJson({ courseId, items });
+    return;
+  }
 
   if (!items.length) {
     console.log(chalk.yellow('No grade items found.'));

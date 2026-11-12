@@ -4,7 +4,7 @@ import { spawnSync } from 'child_process';
 import * as cheerio from 'cheerio';
 import chalk from 'chalk';
 import { APIError, getClient } from '../client.js';
-import { handleErrors, spinner } from '../ui.js';
+import { handleErrors, spinner, isJsonMode, emitJson } from '../ui.js';
 
 const clean = value => (value || '').replace(/\s+/g, ' ').trim();
 const safeName = value => clean(value)
@@ -25,12 +25,20 @@ async function availablePath(directory, filename) {
   return candidate;
 }
 
+function decodeHeaderFilename(raw) {
+  if (/[\x80-\xff]/.test(raw)) {
+    const utf8 = Buffer.from(raw, 'latin1').toString('utf8');
+    if (!utf8.includes('\ufffd')) return utf8;
+  }
+  return raw;
+}
+
 function filenameFromResponse(response, fallback) {
   const disposition = response.headers?.['content-disposition'] || '';
   const encoded = disposition.match(/filename\*=UTF-8''([^;]+)/i);
   const basic = disposition.match(/filename="?([^";]+)"?/i);
   if (encoded) return safeName(decodeURIComponent(encoded[1]));
-  if (basic) return safeName(basic[1]);
+  if (basic) return safeName(decodeHeaderFilename(basic[1]));
   try {
     const pathname = decodeURIComponent(new URL(response.finalUrl || response.config?.url).pathname);
     const tail = pathname.split('/').filter(Boolean).pop();
@@ -278,13 +286,41 @@ export default function (program) {
             } catch (error) {
               console.error(chalk.yellow(`  skipped ${name}: ${error.message}`));
             }
-          } else if (['url', 'hvp', 'lti', 'page'].includes(type)) {
+          } else if (type === 'page') {
+            progress.text = `Saving page ${name}...`;
+            const cmid = client._extractCmid(activity, $) || client._extractCmid(url);
+            if (cmid) {
+              try {
+                const pageData = await client.getPageContent(cmid);
+                const pagesDir = join(courseRoot, 'pages');
+                await mkdir(pagesDir, { recursive: true });
+                const pagePath = await availablePath(pagesDir, `${safeName(name)}.md`);
+                const md = [
+                  `# ${pageData.title || name}`,
+                  '',
+                  `Source: ${pageData.url}`,
+                  '',
+                  pageData.text || '',
+                  ...(pageData.links.length ? ['', '## Links', ...pageData.links.map(l => `- [${l.text || l.url}](${l.url})`)] : []),
+                  ...(pageData.files.length ? ['', '## Files', ...pageData.files.map(f => `- [${f.text || f.url}](${f.url})`)] : []),
+                ].join('\n');
+                await writeFile(pagePath, md);
+                manifest.push({ path: pagePath, sourceUrl: pageData.url, contentType: 'text/markdown' });
+              } catch (error) {
+                if (!isJsonMode()) console.error(chalk.yellow(`  skipped page ${name}: ${error.message}`));
+              }
+            }
+            links.push({ section: label, name, type, url, targets: [] });
+          } else if (type === 'label') {
+            const labelText = clean(activity.find('.contentwithoutlink, .activity-altcontent, .no-overflow').first().text());
+            if (labelText) indexLines.push(`  > ${labelText}`);
+          } else if (['url', 'hvp', 'lti'].includes(type)) {
             progress.text = `Resolving ${name}...`;
             let targets = [];
             try {
               targets = type === 'url' ? await resolveExternalUrl(client, url) : [];
             } catch (error) {
-              console.error(chalk.yellow(`  unresolved ${name}: ${error.message}`));
+              if (!isJsonMode()) console.error(chalk.yellow(`  unresolved ${name}: ${error.message}`));
             }
             links.push({ section: label, name, type, url, targets });
           }
@@ -309,6 +345,18 @@ export default function (program) {
         merged = await convertAndMerge(courseRoot, manifest, options.merge || null);
       }
       progress.succeed(`Saved ${manifest.length} files, ${linkCount} links and ${announcementCount} announcements`);
+      if (isJsonMode()) {
+        emitJson({
+          courseId: id,
+          courseRoot,
+          filesSaved: manifest.length,
+          linkCount,
+          announcementCount,
+          merged,
+          manifest,
+        });
+        return;
+      }
       console.log(chalk.cyan(`  ${courseRoot}`));
       if (merged) console.log(chalk.green(`  PDF: ${Array.isArray(merged) ? `${merged.length} weekly files` : merged}`));
     }));

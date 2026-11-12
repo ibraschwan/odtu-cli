@@ -2,13 +2,35 @@ import { mkdir, writeFile, access } from 'fs/promises';
 import { resolve, join } from 'path';
 import chalk from 'chalk';
 import { getClient } from '../client.js';
-import { handleErrors, spinner } from '../ui.js';
+import { handleErrors, spinner, isJsonMode, emitJson } from '../ui.js';
 
 function safeName(name) {
   return (name || 'download')
     .replace(/[\\/:*?"<>|\x00-\x1f]/g, '_')
     .replace(/^\.+/, '')
     .trim() || 'download';
+}
+
+function decodeHeaderFilename(raw) {
+  if (/[\x80-\xff]/.test(raw)) {
+    const utf8 = Buffer.from(raw, 'latin1').toString('utf8');
+    if (!utf8.includes('\ufffd')) return utf8;
+  }
+  return raw;
+}
+
+function resolveFilename(downloadResult, fallback) {
+  const disposition = downloadResult.contentDisposition || '';
+  const encoded = disposition.match(/filename\*=UTF-8''([^;]+)/i);
+  const basic = disposition.match(/filename="?([^";]+)"?/i);
+  if (encoded) return safeName(decodeURIComponent(encoded[1]));
+  if (basic) return safeName(decodeHeaderFilename(basic[1]));
+  try {
+    const pathname = decodeURIComponent(new URL(downloadResult.finalUrl).pathname);
+    const tail = pathname.split('/').filter(Boolean).pop();
+    if (tail && tail.includes('.')) return safeName(tail);
+  } catch { /* fallback */ }
+  return safeName(fallback);
 }
 
 async function availablePath(directory, filename) {
@@ -43,30 +65,42 @@ export default function (program) {
       const client = getClient();
       const s = spinner('Finding downloadable files...').start();
       const sections = await client.getCourseContents(parsedCourseId);
-      const files = sections.flatMap(section => (section.modules || []))
+      const mods = sections
+        .flatMap(section => (section.modules || []))
         .filter(mod => parsedModuleId === null || mod.id === parsedModuleId)
-        .flatMap(mod => (mod.contents || [])
-          .filter(item => item.type === 'file' && item.fileurl)
-          .map(item => ({ ...item, moduleName: mod.name })));
+        .filter(mod => (mod.contents && mod.contents.length) || ['resource', 'folder', 'assign', 'turnitintooltwo'].includes(mod.modname));
+
+      const files = [];
+      for (const mod of mods) {
+        const resolved = await client.resolveActivityFiles(mod);
+        files.push(...resolved);
+      }
 
       if (!files.length) {
         s.stop();
+        if (isJsonMode()) {
+          emitJson({ courseId: parsedCourseId, moduleId: parsedModuleId, downloaded: [] });
+          return;
+        }
         console.log(chalk.yellow('No downloadable files found. The activity may only contain an external link.'));
         return;
       }
 
       const output = resolve(options.output);
       await mkdir(output, { recursive: true });
-      let downloaded = 0;
+      const saved = [];
       for (const file of files) {
         s.text = `Downloading ${file.filename || file.moduleName}...`;
-        const filename = safeName(file.filename || file.moduleName);
+        const dl = await client.downloadFile(file.fileurl);
+        const filename = resolveFilename(dl, file.filename || file.moduleName);
         const destination = await availablePath(output, filename);
-        const data = await client.downloadFile(file.fileurl);
-        await writeFile(destination, data, { flag: 'wx' });
-        downloaded++;
-        console.log(chalk.green('  saved ') + destination);
+        await writeFile(destination, dl.buffer, { flag: 'wx' });
+        saved.push({ path: destination, sourceUrl: file.fileurl, bytes: dl.buffer.length });
+        if (!isJsonMode()) console.log(chalk.green('  saved ') + destination);
       }
-      s.succeed(`Downloaded ${downloaded} file${downloaded === 1 ? '' : 's'} to ${output}`);
+      s.succeed(`Downloaded ${saved.length} file${saved.length === 1 ? '' : 's'} to ${output}`);
+      if (isJsonMode()) {
+        emitJson({ courseId: parsedCourseId, moduleId: parsedModuleId, output, downloaded: saved });
+      }
     }));
 }
